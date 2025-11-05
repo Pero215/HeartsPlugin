@@ -1,0 +1,6 @@
+name: Hearts
+main: pro.noty.heart.Hearts
+version: ${version}
+api-version: 1.21
+author: Noty
+description: Shows colorized health and Vault economy above entities

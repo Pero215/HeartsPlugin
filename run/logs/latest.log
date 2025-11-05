@@ -1,0 +1,14 @@
+[19:00:13] [ServerMain/INFO]: [bootstrap] Running Java 21 (Java HotSpot(TM) 64-Bit Server VM 21.0.8+12-LTS-250; Oracle Corporation null) on Windows 11 10.0 (amd64)
+[19:00:13] [ServerMain/INFO]: [bootstrap] Loading Paper 1.21.8-60-main@29c8822 (2025-09-06T21:49:13Z) for Minecraft 1.21.8
+[19:00:14] [ServerMain/INFO]: [PluginInitializerManager] Initializing plugins...
+[19:00:14] [Paper Plugin Remapper Thread - 1/INFO]: [ReobfServer] Remapping server...
+[19:00:29] [Paper Plugin Remapper Thread - 1/INFO]: [ReobfServer] Done remapping server in 14418ms.
+[19:00:29] [Paper Plugin Remapper Thread - 2/INFO]: [PluginRemapper] Remapping plugin 'plugins\Vault.jar'...
+[19:00:29] [Paper Plugin Remapper Thread - 2/INFO]: [PluginRemapper] Done remapping plugin 'plugins\Vault.jar' in 378ms.
+[19:00:29] [Paper Plugin Remapper Thread - 1/INFO]: [PluginRemapper] Remapping plugin 'F:\Hearts\build\libs\Hearts-1.1.0.jar'...
+[19:00:29] [Paper Plugin Remapper Thread - 1/INFO]: [PluginRemapper] Done remapping plugin 'F:\Hearts\build\libs\Hearts-1.1.0.jar' in 102ms.
+[19:00:29] [ServerMain/INFO]: [PluginInitializerManager] Initialized 2 plugins
+[19:00:29] [ServerMain/INFO]: [PluginInitializerManager] Bukkit plugins (2):
+ - Hearts (1.1.0), Vault (1.7.3-b131)
+[19:00:38] [ServerMain/WARN]: Failed to load eula.txt
+[19:00:38] [ServerMain/INFO]: You need to agree to the EULA in order to run the server. Go to eula.txt for more info.
