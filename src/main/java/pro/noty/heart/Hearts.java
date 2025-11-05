@@ -15,7 +15,7 @@ import net.milkbowl.vault.economy.Economy;
 
 public class Hearts extends JavaPlugin implements Listener {
 
-    private Economy economy;
+    private static Economy economy;
 
     @Override
     public void onEnable() {
@@ -108,4 +108,8 @@ public class Hearts extends JavaPlugin implements Listener {
             }.runTaskLater(this, 5L);
         }
     }
+    public static Economy getEconomy() {
+        return economy;
+    }
+
 }
