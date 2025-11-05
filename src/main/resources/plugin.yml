@@ -1,5 +1,5 @@
 name: Hearts
-main: pro.noty.Hearts
+main: pro.noty.heart.Hearts
 version: 1.2.0
 api-version: 1.21
 description: Shows dynamic hearts and Vault balance above players and mobs.

@@ -1,4 +1,4 @@
-package pro.noty;
+package pro.noty.heart;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
