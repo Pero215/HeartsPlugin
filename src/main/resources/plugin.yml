@@ -1,6 +1,7 @@
 name: Hearts
-main: pro.noty.heart.Hearts
-version: ${version}
+main: pro.noty.Hearts
+version: 1.2.0
 api-version: 1.21
-author: Noty
-description: Shows colorized health and Vault economy above entities
+description: Shows dynamic hearts and Vault balance above players and mobs.
+author: noty
+depend: [Vault]
