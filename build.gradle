@@ -23,11 +23,8 @@ dependencies {
         exclude group: "org.bukkit", module: "bukkit"
     }
 
-    // Floodgate stable release (for Bedrock detection)
-    compileOnly 'org.geysermc.floodgate:api:2.2.3'
-
-    // Geyser stable release
-    compileOnly 'org.geysermc.geyser:api:2.7.1'
+    compileOnly files('libs/floodgate-api.jar')
+    compileOnly files('libs/geyser-api.jar')
 }
 
 tasks {
