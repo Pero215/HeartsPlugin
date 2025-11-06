@@ -2,6 +2,6 @@ name: Hearts
 main: pro.noty.heart.Hearts
 version: 1.2.0
 api-version: 1.21
-description: Shows dynamic hearts and Vault balance above players and mobs.
-author: noty
-depend: [Vault]
+author: Noty
+description: Show floating hearts above players and mobs with Vault balance.
+softdepend: [Vault, Floodgate, Geyser]
