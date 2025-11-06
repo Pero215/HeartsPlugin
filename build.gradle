@@ -10,11 +10,12 @@ description = 'Shows colorized health and Vault economy above entities'
 repositories {
     mavenCentral()
     maven { url = "https://hub.spigotmc.org/nexus/content/repositories/snapshots/" }
-    maven { url = 'https://repo.geysermc.org/repository/maven-public/' }
+    maven { url = "https://repo.geysermc.org/repository/maven-public/" }
     maven { url = "https://jitpack.io" }
 }
 
 dependencies {
+    // Spigot API
     compileOnly 'org.spigotmc:spigot-api:1.21.8-R0.1-SNAPSHOT'
 
     // Vault API
@@ -22,13 +23,12 @@ dependencies {
         exclude group: "org.bukkit", module: "bukkit"
     }
 
-    // Floodgate stable
+    // Floodgate stable release (for Bedrock detection)
     compileOnly 'org.geysermc.floodgate:api:2.2.3'
 
-    // Geyser stable
+    // Geyser stable release
     compileOnly 'org.geysermc.geyser:api:2.7.1'
 }
-
 
 tasks {
     runServer {
