@@ -195,4 +195,8 @@ public class Hearts extends JavaPlugin {
         for (int i = used; i < totalHearts; i++) sb.append("♡");
         return sb.toString();
     }
+    public FloodgateApi getFloodgate() {
+        return floodgate;
+    }
+
 }

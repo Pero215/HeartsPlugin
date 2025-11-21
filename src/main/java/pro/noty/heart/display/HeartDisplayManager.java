@@ -1,4 +1,4 @@
-package pro.noty.heart;
+package pro.noty.heart.display;
 
 import net.kyori.adventure.text.Component;
 import org.bukkit.*;
@@ -8,6 +8,7 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import pro.noty.heart.Hearts;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -17,24 +18,22 @@ public class HeartDisplayManager {
 
     private final Hearts plugin;
 
-    // One armorstand per entity
     private final Map<LivingEntity, ArmorStand> displays = new HashMap<>();
 
-    // Radius to show actionbar to Geyser players
     private static final double ACTIONBAR_RADIUS = 12 * 12;
 
     public HeartDisplayManager(Hearts plugin) {
         this.plugin = plugin;
     }
 
-    /** Update all heart displays */
+    /** Update all displays */
     public void update() {
         cleanupDead();
 
         for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
+            for (Entity e : world.getEntities()) {
 
-                if (!(entity instanceof LivingEntity living)) continue;
+                if (!(e instanceof LivingEntity living)) continue;
                 if (living.isDead()) continue;
 
                 updateForEntity(living);
@@ -42,66 +41,61 @@ public class HeartDisplayManager {
         }
     }
 
-    /** Update one entity's hologram */
+    /** Single entity update */
     private void updateForEntity(LivingEntity living) {
 
-        // health
-        AttributeInstance maxAttr = living.getAttribute(Attribute.MAX_HEALTH);
-        double maxHp = (maxAttr != null ? maxAttr.getValue() : 20.0);
+        AttributeInstance maxA = living.getAttribute(Attribute.MAX_HEALTH);
+        double maxHp = (maxA != null ? maxA.getValue() : 20.0);
         double hp = living.getHealth();
 
-        // build hearts
-        String hearts = buildHeartBar(hp, maxHp);
+        String heartBar = buildHeartBar(hp, maxHp);
 
-        // get or create hologram
         ArmorStand stand = displays.get(living);
         if (stand == null || stand.isDead()) {
             stand = spawnStand(living);
             displays.put(living, stand);
         }
 
-        // move hologram
         stand.teleport(living.getLocation().add(0, living.getHeight() + 0.6, 0));
 
-        // show economy
-        String balPart = "";
+        // Economy
+        String eco = "";
         if (living instanceof Player p && Hearts.getEconomy() != null) {
-            balPart = ChatColor.GOLD + "  💰" + String.format("%.1f", Hearts.getEconomy().getBalance(p));
+            eco = ChatColor.GOLD + "  💰" + String.format("%.1f", Hearts.getEconomy().getBalance(p));
         }
 
-        // set hologram text
-        stand.customName(Component.text(ChatColor.RED + hearts + balPart));
+        // Set name using Adventure Component
+        stand.customName(Component.text(ChatColor.RED + heartBar + eco));
 
-        // send actionbar to bedrock players
-        if (plugin.floodgate != null) {
+        // Floodgate actionbar
+        if (plugin.getFloodgateAPI() != null) {
             for (Player viewer : Bukkit.getOnlinePlayers()) {
                 try {
-                    if (plugin.floodgate.isFloodgatePlayer(viewer.getUniqueId())) {
-                        if (viewer.getWorld().equals(living.getWorld())
+                    if (plugin.getFloodgateAPI().isFloodgatePlayer(viewer.getUniqueId())) {
+                        if (viewer.getWorld() == living.getWorld()
                                 && viewer.getLocation().distanceSquared(living.getLocation()) <= ACTIONBAR_RADIUS) {
-                            viewer.sendActionBar(Component.text(ChatColor.stripColor(hearts + balPart)));
+                            viewer.sendActionBar(Component.text(ChatColor.stripColor(heartBar + eco)));
                         }
                     }
-                } catch (Throwable ignored) {}
+                } catch (Exception ignored) {}
             }
         }
     }
 
-
-    /** Spawn armor stand */
+    /** Spawn hologram ArmorStand */
     private ArmorStand spawnStand(LivingEntity ent) {
-        Location loc = ent.getLocation().add(0, ent.getHeight() + 0.6, 0);
+        Location l = ent.getLocation().add(0, ent.getHeight() + 0.6, 0);
 
-        ArmorStand as = ent.getWorld().spawn(loc, ArmorStand.class);
-        as.setVisible(false);
-        as.setGravity(false);
+        ArmorStand as = ent.getWorld().spawn(l, ArmorStand.class);
         as.setMarker(true);
+        as.setInvisible(true);
+        as.setGravity(false);
         as.setCustomNameVisible(true);
 
         return as;
     }
 
-    /** Clean up removed mobs/players */
+    /** Cleanup */
     private void cleanupDead() {
         Iterator<Map.Entry<LivingEntity, ArmorStand>> it = displays.entrySet().iterator();
 
@@ -109,16 +103,16 @@ public class HeartDisplayManager {
             Map.Entry<LivingEntity, ArmorStand> e = it.next();
 
             LivingEntity ent = e.getKey();
-            ArmorStand stand = e.getValue();
+            ArmorStand st = e.getValue();
 
-            if (ent == null || ent.isDead() || stand == null || stand.isDead()) {
-                if (stand != null && !stand.isDead()) stand.remove();
+            if (ent == null || ent.isDead() || st == null || st.isDead()) {
+                if (st != null && !st.isDead()) st.remove();
                 it.remove();
             }
         }
     }
 
-    /** Build hearts (❤ 💔 ♡) clean horizontal bar */
+    /** Build ❤ 💔 ♡ bar */
     private String buildHeartBar(double hp, double max) {
         int total = (int) Math.ceil(max / 2.0);
         int full = (int) (hp / 2.0);
@@ -129,10 +123,10 @@ public class HeartDisplayManager {
         // full hearts
         for (int i = 0; i < full; i++) sb.append("❤");
 
-        // half heart
+        // half
         if (half) sb.append("💔");
 
-        // empty hearts
+        // empty
         int used = full + (half ? 1 : 0);
         for (int i = used; i < total; i++) sb.append("♡");
 
