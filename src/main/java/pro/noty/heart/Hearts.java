@@ -1,5 +1,5 @@
 package pro.noty.heart;
-import net.kyori.adventure.text.Component;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -158,7 +158,9 @@ public class Hearts extends JavaPlugin {
                                         // only send action bar for viewer if the entity is reasonably close
                                         if (viewer.getWorld().equals(living.getWorld())
                                                 && viewer.getLocation().distanceSquared(living.getLocation()) <= ACTION_BAR_RADIUS * ACTION_BAR_RADIUS) {
-                                            viewer.sendActionBar(Component.text(ChatColor.stripColor(heartLine + balancePart)));                                        }
+                                            // Use Spigot API for action bar
+                                            sendActionBar(viewer, ChatColor.stripColor(heartLine + balancePart));
+                                        }
                                     }
                                 } catch (Throwable t) {
                                     // ignore per-player errors to avoid spamming logs
@@ -169,6 +171,25 @@ public class Hearts extends JavaPlugin {
                 } // end worlds loop
             }
         }.runTaskTimer(this, 0L, TICK_INTERVAL);
+    }
+
+    /**
+     * Send action bar message using Spigot API
+     */
+    private void sendActionBar(Player player, String message) {
+        try {
+            // Use Spigot's action bar API
+            player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                    net.md_5.bungee.api.chat.TextComponent.fromLegacyText(message));
+        } catch (Throwable e) {
+            // Fallback: try using titles (less ideal but works)
+            try {
+                player.sendTitle("", message, 0, 40, 10);
+            } catch (Throwable e2) {
+                // Final fallback: regular chat message
+                player.sendMessage(message);
+            }
+        }
     }
 
     /**
