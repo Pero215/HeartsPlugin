@@ -25,6 +25,7 @@ dependencies {
 
     compileOnly files('libs/Floodgate-api.jar')
     compileOnly files('libs/geyser-api.jar')
+    compileOnly "net.kyori:adventure-api:4.14.0"
 }
 
 tasks {
