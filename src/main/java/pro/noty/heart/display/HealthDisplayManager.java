@@ -1,84 +1,141 @@
-package pro.noty.heart.display;
+package pro.noty.heart;
 
-import org.bukkit.Bukkit;
+import net.kyori.adventure.text.Component;
+import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.*;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.scheduler.BukkitRunnable;
-import pro.noty.heart.Hearts;
-import pro.noty.heart.util.HeartUtils;
-import pro.noty.heart.util.VaultHook;
 
-public class HealthDisplayManager implements Listener {
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+public class HeartDisplayManager {
 
     private final Hearts plugin;
 
-    public HealthDisplayManager(Hearts plugin) {
+    // One armorstand per entity
+    private final Map<LivingEntity, ArmorStand> displays = new HashMap<>();
+
+    // Radius to show actionbar to Geyser players
+    private static final double ACTIONBAR_RADIUS = 12 * 12;
+
+    public HeartDisplayManager(Hearts plugin) {
         this.plugin = plugin;
-        startAutoUpdate();
     }
 
-    private void startAutoUpdate() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (Entity e : Bukkit.getWorlds().get(0).getEntities()) {
-                    if (e instanceof LivingEntity living) {
-                        updateEntityName(living);
-                    }
-                }
+    /** Update all heart displays */
+    public void update() {
+        cleanupDead();
+
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+
+                if (!(entity instanceof LivingEntity living)) continue;
+                if (living.isDead()) continue;
+
+                updateForEntity(living);
             }
-        }.runTaskTimer(plugin, 0L, 40L); // every 2 seconds
-    }
-
-    @EventHandler
-    public void onDamage(EntityDamageEvent e) {
-        if (e.getEntity() instanceof LivingEntity living) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> updateEntityName(living), 5L);
         }
     }
 
-    @EventHandler
-    public void onHeal(EntityRegainHealthEvent e) {
-        if (e.getEntity() instanceof LivingEntity living) {
-            Bukkit.getScheduler().runTaskLater(plugin, () -> updateEntityName(living), 5L);
+    /** Update one entity's hologram */
+    private void updateForEntity(LivingEntity living) {
+
+        // health
+        AttributeInstance maxAttr = living.getAttribute(Attribute.MAX_HEALTH);
+        double maxHp = (maxAttr != null ? maxAttr.getValue() : 20.0);
+        double hp = living.getHealth();
+
+        // build hearts
+        String hearts = buildHeartBar(hp, maxHp);
+
+        // get or create hologram
+        ArmorStand stand = displays.get(living);
+        if (stand == null || stand.isDead()) {
+            stand = spawnStand(living);
+            displays.put(living, stand);
+        }
+
+        // move hologram
+        stand.teleport(living.getLocation().add(0, living.getHeight() + 0.6, 0));
+
+        // show economy
+        String balPart = "";
+        if (living instanceof Player p && Hearts.getEconomy() != null) {
+            balPart = ChatColor.GOLD + "  💰" + String.format("%.1f", Hearts.getEconomy().getBalance(p));
+        }
+
+        // set hologram text
+        stand.customName(Component.text(ChatColor.RED + hearts + balPart));
+
+        // send actionbar to bedrock players
+        if (plugin.floodgate != null) {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                try {
+                    if (plugin.floodgate.isFloodgatePlayer(viewer.getUniqueId())) {
+                        if (viewer.getWorld().equals(living.getWorld())
+                                && viewer.getLocation().distanceSquared(living.getLocation()) <= ACTIONBAR_RADIUS) {
+                            viewer.sendActionBar(Component.text(ChatColor.stripColor(hearts + balPart)));
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
         }
     }
 
-    @EventHandler
-    public void onSpawn(EntitySpawnEvent e) {
-        if (e.getEntity() instanceof LivingEntity living) {
-            updateEntityName(living);
+
+    /** Spawn armor stand */
+    private ArmorStand spawnStand(LivingEntity ent) {
+        Location loc = ent.getLocation().add(0, ent.getHeight() + 0.6, 0);
+
+        ArmorStand as = ent.getWorld().spawn(loc, ArmorStand.class);
+        as.setVisible(false);
+        as.setGravity(false);
+        as.setMarker(true);
+        as.setCustomNameVisible(true);
+
+        return as;
+    }
+
+    /** Clean up removed mobs/players */
+    private void cleanupDead() {
+        Iterator<Map.Entry<LivingEntity, ArmorStand>> it = displays.entrySet().iterator();
+
+        while (it.hasNext()) {
+            Map.Entry<LivingEntity, ArmorStand> e = it.next();
+
+            LivingEntity ent = e.getKey();
+            ArmorStand stand = e.getValue();
+
+            if (ent == null || ent.isDead() || stand == null || stand.isDead()) {
+                if (stand != null && !stand.isDead()) stand.remove();
+                it.remove();
+            }
         }
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        updateEntityName(e.getPlayer());
-    }
+    /** Build hearts (❤ 💔 ♡) clean horizontal bar */
+    private String buildHeartBar(double hp, double max) {
+        int total = (int) Math.ceil(max / 2.0);
+        int full = (int) (hp / 2.0);
+        boolean half = (hp % 2.0) >= 1;
 
-    private void updateEntityName(LivingEntity entity) {
-        double health = entity.getHealth();
-        double maxHealth = entity.getAttribute(Attribute.MAX_HEALTH).getValue();
+        StringBuilder sb = new StringBuilder();
 
-        String heartBar = HeartUtils.getColoredHearts(health, maxHealth);
+        // full hearts
+        for (int i = 0; i < full; i++) sb.append("❤");
 
-        String name;
-        if (entity instanceof Player player) {
-            String balance = VaultHook.getBalanceString(player);
-            name = "§7💀 " + player.getName() + "\n" + heartBar + (balance.isEmpty() ? "" : "\n§6" + balance);
-        } else {
-            String mobName = entity.getType().name().toLowerCase().replace("_", " ");
-            mobName = mobName.substring(0, 1).toUpperCase() + mobName.substring(1);
-            name = "§7💀 " + mobName + "\n" + heartBar;
-        }
+        // half heart
+        if (half) sb.append("💔");
 
-        entity.setCustomNameVisible(true);
-        entity.setCustomName(name);
+        // empty hearts
+        int used = full + (half ? 1 : 0);
+        for (int i = used; i < total; i++) sb.append("♡");
+
+        return sb.toString();
     }
 }
