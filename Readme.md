@@ -82,3 +82,45 @@ MIT License – free to modify & use.
 ---
 
 > Made for a smooth, modern Minecraft experience ❤️
+
+## 🆕 Recent Updates
+
+### ✔ Bedrock Action Bar Support
+
+Bedrock players (Floodgate) now receive heart bars through action bar since they can’t see floating text properly.
+
+### ✔ Custom Death Messages
+
+Now the plugin shows:
+
+* Who killed the player (mob/player)
+* Exact reason of death (fall, lava, fire, explosion, etc.)
+* Remaining health display like: `💔 11.2/20.0`
+
+Example:
+
+```
+Player Pro215 was slain by Zombie 💔 11.2/20.0
+```
+
+### ✔ Floodgate + Geyser Safe Integration
+
+No crashes if Floodgate is not installed. Bedrock detection is safe.
+
+### ✔ Improved Floating Heart System
+
+* Auto-spawning invisible armor stands
+* Smooth updates every 10 ticks
+* Works for all mobs + players
+
+### ✔ Vault Economy Enhancements
+
+Shows balance below heart bar for Java players.
+
+### ✔ Fully Compatible with Paper 1.21+
+
+No deprecated API. Attribute system updated.
+
+---
+
+If you want, I can also add a **preview image**, **plugin.yml**, or **config.yml** section.
