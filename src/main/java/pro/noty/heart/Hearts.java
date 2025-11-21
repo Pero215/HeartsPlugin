@@ -1,21 +1,17 @@
 package pro.noty.heart;
-
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.World;
 
 import net.milkbowl.vault.economy.Economy;
 import org.geysermc.floodgate.api.FloodgateApi;
@@ -23,37 +19,52 @@ import org.geysermc.floodgate.api.FloodgateApi;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 
-public class Hearts extends JavaPlugin implements Listener {
+public class Hearts extends JavaPlugin {
 
     private static Economy economy;
 
-    // 1 armor stand per living entity
+    // One ArmorStand per tracked entity
     private final Map<LivingEntity, ArmorStand> heartDisplays = new HashMap<>();
 
+    // Floodgate API instance if available (null otherwise)
     private FloodgateApi floodgate;
 
-    private final long UPDATE_INTERVAL = 10L;
-    private final double ACTIONBAR_DISTANCE = 12.0;
+    // Configuration-ish values (you can make these read from config later)
+    private final long TICK_INTERVAL = 10L; // update every 10 ticks (0.5s)
+    private final double ACTION_BAR_RADIUS = 12.0; // radius to send actionbar to bedrock players
 
     @Override
     public void onEnable() {
         getLogger().info("❤️ Hearts plugin enabling...");
 
+        // Vault setup
         setupVault();
-        setupFloodgate();
 
-        // Register death event
-        getServer().getPluginManager().registerEvents(this, this);
+        // Floodgate setup (safe)
+        try {
+            if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
+                floodgate = FloodgateApi.getInstance();
+                getLogger().info("🌐 Floodgate detected and hooked.");
+            } else {
+                floodgate = null;
+                getLogger().info("🌐 Floodgate not present.");
+            }
+        } catch (Throwable t) {
+            // If Floodgate classes are not present at runtime, avoid crashing
+            floodgate = null;
+            getLogger().warning("⚠ Floodgate API unavailable: " + t.getMessage());
+        }
 
-        // Start updater
+        // Start the repeating updater
         startHeartUpdater();
-
         getLogger().info("❤️ Hearts plugin enabled.");
     }
 
     @Override
     public void onDisable() {
+        // cleanup armor stands
         for (ArmorStand as : heartDisplays.values()) {
             if (as != null && !as.isDead()) as.remove();
         }
@@ -61,191 +72,127 @@ public class Hearts extends JavaPlugin implements Listener {
         getLogger().info("❤️ Hearts plugin disabled.");
     }
 
-    // --------------------------
-    // 🔧 VAULT
-    // --------------------------
     private void setupVault() {
         try {
             if (Bukkit.getPluginManager().getPlugin("Vault") != null) {
                 var rsp = Bukkit.getServicesManager().getRegistration(Economy.class);
                 if (rsp != null) {
                     economy = rsp.getProvider();
-                    getLogger().info("💰 Vault linked.");
+                    getLogger().info("💰 Vault economy provider linked.");
                     return;
                 }
             }
-        } catch (Exception ignored) {}
-        economy = null;
-        getLogger().warning("⚠ Vault not found.");
-    }
-
-    // --------------------------
-    // 🌐 FLOODGATE
-    // --------------------------
-    private void setupFloodgate() {
-        try {
-            if (Bukkit.getPluginManager().getPlugin("floodgate") != null) {
-                floodgate = FloodgateApi.getInstance();
-                getLogger().info("🌐 Floodgate detected.");
-            }
-        } catch (Exception ignored) {
-            floodgate = null;
+        } catch (Throwable t) {
+            // ignore
         }
+        economy = null;
+        getLogger().warning("⚠ Vault not found or not linked - economy features disabled.");
     }
 
-    // --------------------------
-    // ❤️ HEART BAR UPDATER
-    // --------------------------
+    public static Economy getEconomy() {
+        return economy;
+    }
+
     private void startHeartUpdater() {
         new BukkitRunnable() {
             @Override
             public void run() {
-
-                // Cleanup
+                // Clean up dead entities from our map first
                 Iterator<Map.Entry<LivingEntity, ArmorStand>> iter = heartDisplays.entrySet().iterator();
                 while (iter.hasNext()) {
-                    var e = iter.next();
-                    LivingEntity le = e.getKey();
-                    ArmorStand st = e.getValue();
-                    if (le == null || le.isDead() || st == null || st.isDead()) {
-                        if (st != null) st.remove();
+                    Map.Entry<LivingEntity, ArmorStand> e = iter.next();
+                    LivingEntity ent = e.getKey();
+                    ArmorStand stand = e.getValue();
+                    if (ent == null || ent.isDead() || stand == null || stand.isDead()) {
+                        if (stand != null && !stand.isDead()) stand.remove();
                         iter.remove();
                     }
                 }
 
-                // Update hearts for all worlds
-                for (World w : Bukkit.getWorlds()) {
-                    for (Entity ent : w.getEntities()) {
-
-                        if (!(ent instanceof LivingEntity living)) continue;
+                // Iterate through all worlds and their entities
+                for (World world : Bukkit.getWorlds()) {
+                    for (Entity entity : world.getEntities()) {
+                        if (!(entity instanceof LivingEntity living)) continue;
                         if (living.isDead()) continue;
 
+                        // Safely get max health attribute (guard null)
                         AttributeInstance maxAttr = living.getAttribute(Attribute.MAX_HEALTH);
-                        double max = (maxAttr != null ? maxAttr.getValue() : 20.0);
-                        double hp = living.getHealth();
+                        double maxHealth = (maxAttr != null) ? maxAttr.getValue() : 20.0;
+                        double health = living.getHealth();
 
-                        String heartBar = buildHeartBar(hp, max);
+                        String heartLine = buildHeartBar(health, maxHealth);
 
+                        // Ensure we have an armorstand for this entity
                         ArmorStand stand = heartDisplays.get(living);
                         if (stand == null || stand.isDead()) {
-                            stand = w.spawn(living.getLocation().add(0, living.getHeight() + 0.6, 0), ArmorStand.class);
-                            stand.setVisible(false);
-                            stand.setMarker(true);
-                            stand.setGravity(false);
-                            stand.setCustomNameVisible(true);
+                            // spawn the stand slightly above head
+                            Location spawnLoc = living.getLocation().add(0.0, living.getHeight() + 0.6, 0.0);
+                            stand = (ArmorStand) living.getWorld().spawn(spawnLoc, ArmorStand.class);
+                            stand.setVisible(false);          // invisible body
+                            stand.setMarker(true);            // small hitbox
+                            stand.setGravity(false);          // doesn't fall
+                            stand.setCustomNameVisible(true); // show custom name (floating text)
                             heartDisplays.put(living, stand);
                         }
 
-                        // Update location
-                        stand.teleport(living.getLocation().add(0, living.getHeight() + 0.6, 0));
+                        // Move stand to track the entity (teleport is fine for this frequency)
+                        Location above = living.getLocation().add(0.0, living.getHeight() + 0.6, 0.0);
+                        stand.teleport(above);
 
-                        // Add balance (only players)
-                        String bal = "";
+                        // Append balance if entity is a player and economy present
+                        String balancePart = "";
                         if (living instanceof Player player && economy != null) {
-                            bal = ChatColor.GOLD + "  💰" + String.format("%.1f", economy.getBalance(player));
+                            double bal = economy.getBalance(player);
+                            balancePart = ChatColor.GOLD + String.format("  💰%.1f", bal);
                         }
 
-                        stand.setCustomName(ChatColor.RED + heartBar + bal);
+                        // Set the custom name (colored). This will be visible as floating text.
+                        stand.setCustomName(ChatColor.RED + heartLine + balancePart);
 
-                        // Send action bar to bedrock players only
+                        // ACTION BAR for bedrock players
                         if (floodgate != null) {
                             for (Player viewer : Bukkit.getOnlinePlayers()) {
-                                if (viewer.getWorld() != living.getWorld()) continue;
-                                if (viewer.getLocation().distanceSquared(living.getLocation()) > ACTIONBAR_DISTANCE * ACTIONBAR_DISTANCE)
-                                    continue;
-
                                 try {
                                     if (floodgate.isFloodgatePlayer(viewer.getUniqueId())) {
-                                        sendActionBar(viewer, ChatColor.RED + heartBar + bal);
+
+                                        if (viewer.getWorld().equals(living.getWorld())
+                                                && viewer.getLocation().distanceSquared(living.getLocation()) <= ACTION_BAR_RADIUS * ACTION_BAR_RADIUS) {
+
+                                            viewer.spigot().sendMessage(
+                                                    net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                                                    net.md_5.bungee.api.chat.TextComponent.fromLegacyText(
+                                                            ChatColor.stripColor(heartLine + balancePart)
+                                                    )
+                                            );
+                                        }
                                     }
-                                } catch (Exception ignored) {}
+                                } catch (Throwable t) {
+                                    // ignore
+                                }
                             }
                         }
                     }
-                }
+                } // end worlds loop
             }
-        }.runTaskTimer(this, 0L, UPDATE_INTERVAL);
+        }.runTaskTimer(this, 0L, TICK_INTERVAL);
     }
 
-    // --------------------------
-    // 📢 ACTION BAR
-    // --------------------------
-    private void sendActionBar(Player p, String msg) {
-        try {
-            p.spigot().sendMessage(
-                    net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
-                    net.md_5.bungee.api.chat.TextComponent.fromLegacyText(msg)
-            );
-        } catch (Exception e) {
-            p.sendMessage(msg);
-        }
-    }
-
-    // --------------------------
-    // ❤️ HEART BAR BUILDER
-    // --------------------------
-    private String buildHeartBar(double hp, double max) {
-        int total = (int) Math.round(max / 2.0);
-        int full = (int) (hp / 2);
-        boolean half = ((int) hp) % 2 == 1;
+    /**
+     * Build a heart bar using icons:
+     *  - full heart '❤' = 2 HP
+     *  - half heart '💔' = 1 HP
+     *  - empty '♡' for missing hearts
+     */
+    private String buildHeartBar(double health, double max) {
+        int totalHearts = Math.max(1, (int) Math.round(max / 2.0)); // ensure at least 1
+        int fullHearts = (int) (health / 2.0);
+        boolean half = ((int) health) % 2 == 1;
 
         StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < full; i++) sb.append("❤");
+        for (int i = 0; i < fullHearts; i++) sb.append("❤");
         if (half) sb.append("💔");
-
-        int used = full + (half ? 1 : 0);
-        for (int i = used; i < total; i++) sb.append("♡");
-
+        int used = fullHearts + (half ? 1 : 0);
+        for (int i = used; i < totalHearts; i++) sb.append("♡");
         return sb.toString();
-    }
-
-    // --------------------------
-    // 💀 CUSTOM DEATH MESSAGE
-    // --------------------------
-    @EventHandler
-    public void onPlayerDeath(PlayerDeathEvent event) {
-        Player player = event.getEntity();
-
-        String victim = player.getName();
-        double hp = player.getHealth();
-        double maxHp = player.getAttribute(Attribute.MAX_HEALTH).getValue();
-
-        String heartInfo = ChatColor.RED + " 💔 " + String.format("%.1f/%.1f", hp, maxHp);
-
-        Entity killer = player.getKiller();
-
-        // Killed by mob or player
-        if (killer != null) {
-            String killerName = killer.getType().name().replace("_", " ").toLowerCase();
-            killerName = killerName.substring(0, 1).toUpperCase() + killerName.substring(1);
-
-            event.setDeathMessage(
-                    ChatColor.RED + victim +
-                            ChatColor.GRAY + " was slain by " +
-                            ChatColor.YELLOW + killerName +
-                            heartInfo
-            );
-            return;
-        }
-
-        // Non-entity reason (fall, lava, void…)
-        if (player.getLastDamageCause() != null) {
-            DamageCause cause = player.getLastDamageCause().getCause();
-
-            String causeName = cause.name().replace("_", " ").toLowerCase();
-            causeName = causeName.substring(0, 1).toUpperCase() + causeName.substring(1);
-
-            event.setDeathMessage(
-                    ChatColor.RED + victim +
-                            ChatColor.GRAY + " died due to " +
-                            ChatColor.YELLOW + causeName +
-                            heartInfo
-            );
-            return;
-        }
-
-        // Fallback
-        event.setDeathMessage(ChatColor.RED + victim + " died!" + heartInfo);
     }
 }
