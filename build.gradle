@@ -23,7 +23,7 @@ dependencies {
         exclude group: "org.bukkit", module: "bukkit"
     }
 
-    compileOnly files('libs/floodgate-api.jar')
+    compileOnly files('libs/Floodgate-api.jar')
     compileOnly files('libs/geyser-api.jar')
 }
 
